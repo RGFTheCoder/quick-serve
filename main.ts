@@ -6,7 +6,7 @@ if (import.meta.main) {
     const url = new URL(request.url);
     const filepath = decodeURIComponent(url.pathname);
 
-    console.log(
+    console.group(
       `[${blue(new Date().toISOString())}] ${request.method} ${yellow(filepath)}`,
     );
 
@@ -14,13 +14,14 @@ if (import.meta.main) {
       const fileInfo = await Deno.stat("." + filepath);
 
       if (fileInfo.isDirectory) {
-        console.log(`\tServing directory listing for: ${yellow(filepath)}`);
+        console.log(`Serving directory listing for: ${yellow(filepath)}`);
         const dirEntries = [`<li><a href="..">..</a></li>`];
         for await (const entry of Deno.readDir("." + filepath)) {
           dirEntries.push(
             `<li><a href="./${encodeURIComponent(entry.name)}">${entry.name}</a></li>`,
           );
         }
+        console.groupEnd();
         return new Response(
           `<!DOCTYPE html>
           <html>
@@ -39,8 +40,8 @@ if (import.meta.main) {
         filepath.endsWith(".ts") &&
         request.headers.get("sec-fetch-dest") == "script"
       ) {
-        console.log(
-          `\tTransforming TypeScript file ${yellow(filepath)} to JavaScript for script request`,
+        console.group(
+          `Transforming TypeScript file ${yellow(filepath)} to JavaScript for script request`,
         );
         const content = await Deno.readTextFile("." + filepath);
         const result = transform(content, {
@@ -52,22 +53,25 @@ if (import.meta.main) {
           },
         });
         console.log(
-          `\t\tSuccessfully transformed ${yellow(filepath)} to JavaScript`,
+          `Successfully transformed ${yellow(filepath)} to JavaScript`,
         );
+        console.groupEnd();
+        console.groupEnd();
         return new Response(result.code, {
           headers: { "Content-Type": "application/javascript" },
         });
       }
 
-      console.log(`\tServing static file: ${yellow(filepath)}`);
+      console.log(`Serving static file: ${yellow(filepath)}`);
+      console.groupEnd();
       const file = await Deno.open("." + filepath, { read: true });
       return new Response(file.readable);
     } catch {
       if (filepath.endsWith(".js")) {
         try {
           const tsFile = "." + filepath.replace(/\.js$/, ".ts");
-          console.log(
-            `\tAttempting to transform TypeScript file ${yellow(tsFile)} to JavaScript`,
+          console.group(
+            `Attempting to transform TypeScript file ${yellow(tsFile)} to JavaScript`,
           );
           const tsContent = await Deno.readTextFile(tsFile);
           const result = transform(tsContent, {
@@ -79,8 +83,10 @@ if (import.meta.main) {
             },
           });
           console.log(
-            `\t\tSuccessfully transformed ${yellow(tsFile)} to JavaScript`,
+            `Successfully transformed ${yellow(tsFile)} to JavaScript`,
           );
+          console.groupEnd();
+          console.groupEnd();
           return new Response(result.code, {
             headers: { "Content-Type": "application/javascript" },
           });
@@ -94,6 +100,7 @@ if (import.meta.main) {
       }
 
       console.log(red(`\t404 Not Found: ${yellow(filepath)}`));
+      console.groupEnd();
       return new Response("404 Not Found", { status: 404 });
     }
   });
