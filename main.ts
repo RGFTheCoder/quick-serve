@@ -23,8 +23,6 @@ if (import.meta.main) {
         const path = filepath.split("/");
         if (path.at(-1) !== "") path.push("");
 
-        console.log(path);
-
         const dirEntries = [
           ` <li><a href="${path.slice(0, -2).join("/") || "/"}">..</a></li>`,
         ];
