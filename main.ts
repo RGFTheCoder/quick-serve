@@ -69,7 +69,22 @@ if (import.meta.main) {
               syntax: "typescript",
             },
           },
+          sourceMaps: true,
         });
+
+        const map =
+          "map" in result && typeof result.map === "string"
+            ? JSON.parse(result.map)
+            : null;
+
+        if (map) {
+          map.sources[0] = filepath;
+
+          result.code +=
+            "\n//# sourceMappingURL=data:application/json;base64," +
+            btoa(JSON.stringify(map));
+        }
+
         console.log(
           `Successfully transformed ${yellow(filepath)} to JavaScript`,
         );
@@ -99,7 +114,23 @@ if (import.meta.main) {
                 syntax: "typescript",
               },
             },
+
+            sourceMaps: true,
           });
+
+          const map =
+            "map" in result && typeof result.map === "string"
+              ? JSON.parse(result.map)
+              : null;
+
+          if (map) {
+            map.sources[0] = filepath;
+
+            result.code +=
+              "\n//# sourceMappingURL=data:application/json;base64," +
+              btoa(JSON.stringify(map));
+          }
+
           console.log(
             `Successfully transformed ${yellow(tsFile)} to JavaScript`,
           );
