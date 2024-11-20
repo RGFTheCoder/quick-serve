@@ -14,14 +14,32 @@ if (import.meta.main) {
       const fileInfo = await Deno.stat("." + filepath);
 
       if (fileInfo.isDirectory) {
+        if (!filepath.endsWith("/")) {
+          console.groupEnd();
+          return Response.redirect(new URL(filepath + "/", request.url), 301);
+        }
         console.log(`Serving directory listing for: ${yellow(filepath)}`);
-        const dirEntries = [`<li><a href="..">..</a></li>`];
-        for await (const entry of Deno.readDir("." + filepath)) {
+
+        const path = filepath.split("/");
+        if (path.at(-1) !== "") path.push("");
+
+        console.log(path);
+
+        const dirEntries = [
+          ` <li><a href="${path.slice(0, -2).join("/") || "/"}">..</a></li>`,
+        ];
+
+        const entries = Deno.readDir("." + filepath);
+
+        for await (const entry of entries) {
           dirEntries.push(
-            `<li><a href="./${encodeURIComponent(entry.name)}">${entry.name}</a></li>`,
+            `${entry.isDirectory ? " " : ""}<li><a href="${path.join("/")}${encodeURIComponent(entry.name)}">${entry.name}${entry.isDirectory ? "/" : ""}</a></li>`,
           );
         }
         console.groupEnd();
+
+        dirEntries.sort();
+
         return new Response(
           `<!DOCTYPE html>
           <html>
