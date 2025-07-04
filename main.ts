@@ -1,12 +1,28 @@
-import { transform } from "https://deno.land/x/swc@0.2.1/mod.ts";
+import { transform } from "swc";
 import { red, blue, yellow } from "jsr:@std/fmt/colors";
+import { basename } from "jsr:@std/path/basename";
+import { group } from "./group.ts";
+import { indexFlat, indexRec } from "./index.ts";
+
+// use imports like this later
+// import text from "./static/index.html" with { type: "text" };
+//
+const decoder = new TextDecoder("utf-8");
+const [notfound, indexpage] = await Promise.all([
+  Deno.readFile(import.meta.dirname + "/special/404.html").then((x) =>
+    decoder.decode(x),
+  ),
+  Deno.readFile(import.meta.dirname + "/special/index.html").then((x) =>
+    decoder.decode(x),
+  ),
+]);
 
 if (import.meta.main) {
   Deno.serve({ hostname: "localhost", port: 8080 }, async (request) => {
     const url = new URL(request.url);
     const filepath = decodeURIComponent(url.pathname);
 
-    console.group(
+    using _ = group(
       `[${blue(new Date().toISOString())}] ${request.method} ${yellow(filepath)}`,
     );
 
@@ -15,48 +31,24 @@ if (import.meta.main) {
 
       if (fileInfo.isDirectory) {
         if (!filepath.endsWith("/")) {
-          console.groupEnd();
           return Response.redirect(new URL(filepath + "/", request.url), 301);
         }
         console.log(`Serving directory listing for: ${yellow(filepath)}`);
 
-        const path = filepath.split("/");
-        if (path.at(-1) !== "") path.push("");
+        const userIndexDoc = await Deno.readFile("./special/notfound.html")
+          .then((x) => decoder.decode(x))
+          .catch(() => indexpage);
 
-        const dirEntries = [
-          ` <li><a href="${path.slice(0, -2).join("/") || "/"}">..</a></li>`,
-        ];
-
-        const entries = Deno.readDir("." + filepath);
-
-        for await (const entry of entries) {
-          dirEntries.push(
-            `${entry.isDirectory ? " " : ""}<li><a href="${path.join("/")}${encodeURIComponent(entry.name)}">${entry.name}${entry.isDirectory ? "/" : ""}</a></li>`,
-          );
-        }
-        console.groupEnd();
-
-        dirEntries.sort();
-
-        return new Response(
-          `<!DOCTYPE html>
-          <html>
-            <body>
-              <h1>Directory: ${filepath}</h1>
-              <ul>${dirEntries.join("")}</ul>
-            </body>
-          </html>`,
-          {
-            headers: { "Content-Type": "text/html" },
-          },
-        );
+        return new Response(userIndexDoc, {
+          headers: { "Content-Type": "text/html" },
+        });
       }
 
       if (
         filepath.endsWith(".ts") &&
         request.headers.get("sec-fetch-dest") == "script"
       ) {
-        console.group(
+        using _ = group(
           `Transforming TypeScript file ${yellow(filepath)} to JavaScript for script request`,
         );
         const content = await Deno.readTextFile("." + filepath);
@@ -86,22 +78,19 @@ if (import.meta.main) {
         console.log(
           `Successfully transformed ${yellow(filepath)} to JavaScript`,
         );
-        console.groupEnd();
-        console.groupEnd();
         return new Response(result.code, {
           headers: { "Content-Type": "application/javascript" },
         });
       }
 
       console.log(`Serving static file: ${yellow(filepath)}`);
-      console.groupEnd();
       const file = await Deno.open("." + filepath, { read: true });
       return new Response(file.readable);
     } catch {
       if (filepath.endsWith(".js")) {
         try {
           const tsFile = "." + filepath.replace(/\.js$/, ".ts");
-          console.group(
+          using _ = group(
             `Attempting to transform TypeScript file ${yellow(tsFile)} to JavaScript`,
           );
           const tsContent = await Deno.readTextFile(tsFile);
@@ -132,8 +121,6 @@ if (import.meta.main) {
           console.log(
             `Successfully transformed ${yellow(tsFile)} to JavaScript`,
           );
-          console.groupEnd();
-          console.groupEnd();
           return new Response(result.code, {
             headers: { "Content-Type": "application/javascript" },
           });
@@ -144,11 +131,39 @@ if (import.meta.main) {
             ),
           );
         }
+      } else if (basename(filepath) == "index.json") {
+        return new Response(JSON.stringify(await indexFlat(filepath)), {
+          headers: { "Content-Type": "application/json" },
+        });
+      } else if (basename(filepath) == "rindex.json") {
+        return new Response(JSON.stringify(await indexRec(filepath)), {
+          headers: { "Content-Type": "application/json" },
+        });
       }
 
-      console.log(red(`\t404 Not Found: ${yellow(filepath)}`));
-      console.groupEnd();
-      return new Response("404 Not Found", { status: 404 });
+      using _ = group(red(`404 Not Found: ${yellow(filepath)}`));
+
+      // returns 200 code
+      const userNotFoundDoc = await Deno.readFile("./special/notfound.html")
+        .then((x) => decoder.decode(x))
+        .catch(() => null);
+      // returns 404 code
+      const user404Doc = await Deno.readFile("./special/404.html")
+        .then((x) => decoder.decode(x))
+        .catch(() => notfound);
+
+      if (userNotFoundDoc != null) {
+        console.log(`Serving static ${yellow("404")} with code 200`);
+        return new Response(userNotFoundDoc, {
+          headers: { "Content-Type": "text/html" },
+        });
+      } else {
+        console.log(`Serving static ${red("404")}`);
+        return new Response(user404Doc, {
+          status: 404,
+          headers: { "Content-Type": "text/html" },
+        });
+      }
     }
   });
 }

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Directory</title>
+  </head>
+  <body>
+    <h1>Directory</h1>
+    <ul></ul>
+
+    <script type="module">
+      const index = await fetch("./index.json").then((x) => x.json());
+
+      console.log(index);
+      const title = document.querySelector("title"),
+        h1 = document.querySelector("h1"),
+        ul = document.querySelector("ul");
+
+      title.textContent =
+        h1.textContent =
+          `Directory: ${location.pathname}`;
+
+      if (location.pathname !== "/") {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.href = "..";
+        a.textContent = "..";
+        li.appendChild(a);
+        ul.appendChild(li);
+      }
+
+      const entries = Object.keys(index).sort();
+      for (const item of entries) {
+        if (index[item].type === "dir") {
+          const li = document.createElement("li");
+          const a = document.createElement("a");
+          a.href = index[item].path;
+          a.textContent = item + "/";
+          li.appendChild(a);
+          ul.appendChild(li);
+        }
+      }
+
+      for (const item of entries) {
+        if (index[item].type !== "dir") {
+          const li = document.createElement("li");
+          const a = document.createElement("a");
+          a.href = index[item].path;
+          a.textContent = item;
+          li.appendChild(a);
+          ul.appendChild(li);
+        }
+      }
+    </script>
+  </body>
+</html>
